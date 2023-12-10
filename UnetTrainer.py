@@ -1,0 +1,139 @@
+from typing import Tuple, List, Callable, Iterator, Optional, Dict, Any
+from collections import defaultdict
+import numpy as np
+import torch
+import torch.nn as nn
+import warnings
+warnings.filterwarnings("ignore")
+
+
+class UnetTrainer:
+    """
+    Класс, реализующий обучение модели
+    """
+
+    def __init__(self, model: nn.Module, optimizer: torch.optim.Optimizer,
+                 criterion: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+                 device: str, metric_functions: List[Tuple[str, Callable]] = [],
+                 epoch_number: int = 0,
+                 lr_scheduler: Optional[Any] = None):
+        self.model = model
+        self.optimizer = optimizer
+        self.criterion = criterion
+        self.lr_scheduler = lr_scheduler
+
+        self.device = device
+
+        self.metric_functions = metric_functions
+
+        self.epoch_number = epoch_number
+
+    @torch.no_grad()
+    def evaluate_batch(self, val_iterator: Iterator, eval_on_n_batches: int) -> Optional[Dict[str, float]]:
+        predictions = []
+        targets = []
+
+        losses = []
+
+        for real_batch_number in range(eval_on_n_batches):
+            try:
+                batch = next(val_iterator)
+
+                xs = batch['image'].to(self.device)
+                ys_true = batch['mask'].to(self.device)
+            except StopIteration:
+                if real_batch_number == 0:
+                    return None
+                else:
+                    break
+            ys_pred = self.model.eval()(xs)
+            loss = self.criterion(ys_pred, ys_true)
+
+            losses.append(loss.item())
+
+            predictions.append(ys_pred.cpu())
+            targets.append(ys_true.cpu())
+
+        predictions = torch.cat(predictions, dim=0)
+        targets = torch.cat(targets, dim=0)
+
+        metrics = {'loss': np.mean(losses)}
+
+        for metric_name, metric_fn in self.metric_functions:
+            metrics[metric_name] = metric_fn(predictions, targets).item()
+
+        return metrics
+
+    @torch.no_grad()
+    def evaluate(self, val_loader, eval_on_n_batches: int = 1) -> Dict[str, float]:
+        """
+        Вычисление метрик для эпохи
+        """
+        metrics_sum = defaultdict(float)
+        num_batches = 0
+
+        val_iterator = iter(val_loader)
+
+        while True:
+            batch_metrics = self.evaluate_batch(val_iterator, eval_on_n_batches)
+
+            if batch_metrics is None:
+                break
+
+            for metric_name in batch_metrics:
+                metrics_sum[metric_name] += batch_metrics[metric_name]
+
+            num_batches += 1
+
+        metrics = {}
+
+        for metric_name in metrics_sum:
+            metrics[metric_name] = metrics_sum[metric_name] / num_batches
+
+        return metrics
+
+    def fit_batch(self, train_iterator: Iterator, update_every_n_batches: int) -> Optional[Dict[str, float]]:
+        """
+        Тренировка модели на одном батче
+        """
+
+        self.optimizer.zero_grad()
+
+        predictions = []
+        targets = []
+
+        losses = []
+
+        for real_batch_number in range(update_every_n_batches):
+            try:
+                batch = next(train_iterator)
+
+                xs = batch['image'].to(self.device)
+                ys_true = batch['mask'].to(self.device)
+            except StopIteration:
+                if real_batch_number == 0:
+                    return None
+                else:
+                    break
+
+            ys_pred = self.model.train()(xs)
+            loss = self.criterion(ys_pred, ys_true)
+
+            (loss / update_every_n_batches).backward()
+
+            losses.append(loss.item())
+
+            predictions.append(ys_pred.cpu())
+            targets.append(ys_true.cpu())
+
+        self.optimizer.step()
+
+        predictions = torch.cat(predictions, dim=0)
+        targets = torch.cat(targets, dim=0)
+
+        metrics = {'loss': np.mean(losses)}
+
+        for metric_name, metric_fn in self.metric_functions:
+            metrics[metric_name] = metric_fn(predictions, targets).item()
+
+        return metrics
