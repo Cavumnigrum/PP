@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import warnings
+from tqdm import tqdm
 warnings.filterwarnings("ignore")
 
 
@@ -137,3 +138,67 @@ class UnetTrainer:
             metrics[metric_name] = metric_fn(predictions, targets).item()
 
         return metrics
+
+    def fit_epoch(self, train_loader, update_every_n_batches: int = 1) -> Dict[str, float]:
+        """
+        Одна эпоха тренировки модели
+        """
+
+        metrics_sum = defaultdict(float)
+        num_batches = 0
+
+        train_iterator = iter(train_loader)
+
+        while True:
+            batch_metrics = self.fit_batch(train_iterator, update_every_n_batches)
+
+            if batch_metrics is None:
+                break
+
+            for metric_name in batch_metrics:
+                metrics_sum[metric_name] += batch_metrics[metric_name]
+
+            num_batches += 1
+
+        metrics = {}
+
+        for metric_name in metrics_sum:
+            metrics[metric_name] = metrics_sum[metric_name] / num_batches
+
+        return metrics
+
+    def fit(self, train_loader, num_epochs: int,
+            val_loader=None, update_every_n_batches: int = 1,
+            ) -> Dict[str, np.ndarray]:
+        """
+        Метод, тренирующий модель и вычисляющий метрики для каждой эпохи
+        """
+
+        summary = defaultdict(list)
+
+        def save_metrics(metrics: Dict[str, float], postfix: str = '') -> None:
+            # Сохранение метрик в summary
+            nonlocal summary, self
+
+            for metric in metrics:
+                metric_name, metric_value = f'{metric}{postfix}', metrics[metric]
+
+                summary[metric_name].append(metric_value)
+
+        for _ in tqdm(range(num_epochs - self.epoch_number), initial=self.epoch_number, total=num_epochs):
+            self.epoch_number += 1
+
+            train_metrics = self.fit_epoch(train_loader, update_every_n_batches)
+
+            with torch.no_grad():
+                save_metrics(train_metrics, postfix='_train')
+
+                if val_loader is not None:
+                    test_metrics = self.evaluate(val_loader)
+                    save_metrics(test_metrics, postfix='_test')
+
+            if self.lr_scheduler is not None:
+                self.lr_scheduler.step()
+
+        summary = {metric: np.array(summary[metric]) for metric in summary}
+        return summary
