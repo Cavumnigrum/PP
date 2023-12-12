@@ -9,61 +9,51 @@ warnings.filterwarnings("ignore")
 
 
 class UnetTrainer:
-    """
-    Класс, реализующий обучение модели
-    """
+    def __init__(
+        self,
+        encoder_name: str = "resnet34",
+        encoder_depth: int = 5,
+        encoder_weights: Optional[str] = "imagenet",
+        decoder_use_batchnorm: bool = True,
+        decoder_channels: List[int] = (256, 128, 64, 32, 16),
+        decoder_attention_type: Optional[str] = None,
+        in_channels: int = 3,
+        classes: int = 1,
+        activation: Optional[Union[str, callable]] = None,
+        aux_params: Optional[dict] = None,
+    ):
+        super().__init__()
 
-    def __init__(self, model: nn.Module, optimizer: torch.optim.Optimizer,
-                 criterion: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
-                 device: str, metric_functions: List[Tuple[str, Callable]] = [],
-                 epoch_number: int = 0,
-                 lr_scheduler: Optional[Any] = None):
-        self.model = model
-        self.optimizer = optimizer
-        self.criterion = criterion
-        self.lr_scheduler = lr_scheduler
+        self.encoder = get_encoder(
+            encoder_name,
+            in_channels=in_channels,
+            depth=encoder_depth,
+            weights=encoder_weights,
+        )
 
-        self.device = device
+        self.decoder = UnetDecoder(
+            encoder_channels=self.encoder.out_channels,
+            decoder_channels=decoder_channels,
+            n_blocks=encoder_depth,
+            use_batchnorm=decoder_use_batchnorm,
+            center=True if encoder_name.startswith("vgg") else False,
+            attention_type=decoder_attention_type,
+        )
 
-        self.metric_functions = metric_functions
+        self.segmentation_head = SegmentationHead(
+            in_channels=decoder_channels[-1],
+            out_channels=classes,
+            activation=activation,
+            kernel_size=3,
+        )
 
-        self.epoch_number = epoch_number
+        if aux_params is not None:
+            self.classification_head = ClassificationHead(in_channels=self.encoder.out_channels[-1], **aux_params)
+        else:
+            self.classification_head = None
 
-    @torch.no_grad()
-    def evaluate_batch(self, val_iterator: Iterator, eval_on_n_batches: int) -> Optional[Dict[str, float]]:
-        predictions = []
-        targets = []
-
-        losses = []
-
-        for real_batch_number in range(eval_on_n_batches):
-            try:
-                batch = next(val_iterator)
-
-                xs = batch['image'].to(self.device)
-                ys_true = batch['mask'].to(self.device)
-            except StopIteration:
-                if real_batch_number == 0:
-                    return None
-                else:
-                    break
-            ys_pred = self.model.eval()(xs)
-            loss = self.criterion(ys_pred, ys_true)
-
-            losses.append(loss.item())
-
-            predictions.append(ys_pred.cpu())
-            targets.append(ys_true.cpu())
-
-        predictions = torch.cat(predictions, dim=0)
-        targets = torch.cat(targets, dim=0)
-
-        metrics = {'loss': np.mean(losses)}
-
-        for metric_name, metric_fn in self.metric_functions:
-            metrics[metric_name] = metric_fn(predictions, targets).item()
-
-        return metrics
+        self.name = "u-{}".format(encoder_name)
+        self.initialize()
 
     @torch.no_grad()
     def evaluate(self, val_loader, eval_on_n_batches: int = 1) -> Dict[str, float]:
