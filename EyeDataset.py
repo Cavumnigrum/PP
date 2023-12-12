@@ -29,7 +29,7 @@ warnings.filterwarnings("ignore")
 
 import json
 
-class Dataset(Dataset):
+class EyeDataset(Dataset):
     """
     Класс датасета, организующий загрузку и получение изображений и соответствующих разметок
     """
