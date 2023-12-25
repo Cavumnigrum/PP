@@ -80,5 +80,5 @@
 *Предварительно подготовленные веса хранятся здесь:*
 * [Стандартные данные](https://drive.google.com/file/d/1xZ5nHI_BWo7VlI9UH8X6FmqItIQWxNWi/view?usp=sharing)
 * [Данные, подвергшиеся небольшой аугментации](https://drive.google.com/file/d/1j_Jc7UsmFrXQNGiw1ndEBpW9xPJ52h4e/view?usp=sharing)
-* [Чрезмерная аугментация данных](https://drive.google.com/file/d/1SjYPfzN2MeycDhyQvImkkqKmO7yAF_oE/view?usp=sharing)* 
+* [Чрезмерная аугментация данных](https://drive.google.com/file/d/1SjYPfzN2MeycDhyQvImkkqKmO7yAF_oE/view?usp=sharing)\
 *Вам следует сохранить веса в папке model* 
