@@ -71,7 +71,7 @@ class EyeDataset(Dataset):
             num_channels = 1 + max(self.class_ids.values())
             mask_channels = [np.zeros(image_size, dtype=np.float32) for _ in range(num_channels)]
             mask = np.zeros(image_size, dtype=np.float32)
-
+            print(image_size)
             if type(json_contents) == dict and json_contents['type'] == 'FeatureCollection':
                 features = json_contents['features']
             elif type(json_contents) == list:
@@ -87,8 +87,9 @@ class EyeDataset(Dataset):
             mask_channels[0] = 1 - np.max(mask_channels[1:], axis=0)
 
             return np.stack(mask_channels, axis=-1)
+
         except Exception as e:
-            return np.zeros((1232, 1624, 2))
+            return np.zeros((image_size[0], image_size[1], 2))
 
     def __getitem__(self, idx: int) -> dict:
         # Достаём имя файла по индексу
