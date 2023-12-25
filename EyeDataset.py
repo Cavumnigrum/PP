@@ -1,40 +1,20 @@
 import albumentations as A
-from albumentations.pytorch import ToTensorV2
-
-import pandas as pd
 import numpy as np
 import glob
-from tqdm import tqdm
 import cv2
-from sklearn.model_selection import train_test_split
-!pip install fiona
-import fiona
-!pip install segmentation_models_pytorch
-import segmentation_models_pytorch as smp
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
 from torch.utils.data import Dataset
-from torchvision import datasets, models, transforms
-from torchvision.models import resnet18
-from torchvision.utils import draw_segmentation_masks
-
-from PIL import Image
-import matplotlib.pyplot as plt
-from IPython.display import clear_output
-
 import warnings
+import json
+
 warnings.filterwarnings("ignore")
 
-import json
 
 class EyeDataset(Dataset):
     """
     Класс датасета, организующий загрузку и получение изображений и соответствующих разметок
     """
 
-    def __init__(self, data_folder: str, transform = None):
+    def __init__(self, data_folder: str, transform=None):
         self.class_ids = {"vessel": 1}
 
         self.data_folder = data_folder
@@ -84,28 +64,31 @@ class EyeDataset(Dataset):
         """
         Метод для чтения geojson разметки и перевода в numpy маску
         """
-        with open(path, 'r', encoding='cp1251') as f:  # some files contain cyrillic letters, thus cp1251
-            json_contents = json.load(f)
+        try:
+            with open(path, 'r', encoding='cp1251') as f:  # some files contain cyrillic letters, thus cp1251
+                json_contents = json.load(f)
 
-        num_channels = 1 + max(self.class_ids.values())
-        mask_channels = [np.zeros(image_size, dtype=np.float32) for _ in range(num_channels)]
-        mask = np.zeros(image_size, dtype=np.float32)
+            num_channels = 1 + max(self.class_ids.values())
+            mask_channels = [np.zeros(image_size, dtype=np.float32) for _ in range(num_channels)]
+            mask = np.zeros(image_size, dtype=np.float32)
 
-        if type(json_contents) == dict and json_contents['type'] == 'FeatureCollection':
-            features = json_contents['features']
-        elif type(json_contents) == list:
-            features = json_contents
-        else:
-            features = [json_contents]
+            if type(json_contents) == dict and json_contents['type'] == 'FeatureCollection':
+                features = json_contents['features']
+            elif type(json_contents) == list:
+                features = json_contents
+            else:
+                features = [json_contents]
 
-        for shape in features:
-            channel_id = self.class_ids["vessel"]
-            mask = self.parse_mask(shape['geometry'], image_size)
-            mask_channels[channel_id] = np.maximum(mask_channels[channel_id], mask)
+            for shape in features:
+                channel_id = self.class_ids["vessel"]
+                mask = self.parse_mask(shape['geometry'], image_size)
+                mask_channels[channel_id] = np.maximum(mask_channels[channel_id], mask)
 
-        mask_channels[0] = 1 - np.max(mask_channels[1:], axis=0)
+            mask_channels[0] = 1 - np.max(mask_channels[1:], axis=0)
 
-        return np.stack(mask_channels, axis=-1)
+            return np.stack(mask_channels, axis=-1)
+        except Exception as e:
+            return np.zeros((1232, 1624, 2))
 
     def __getitem__(self, idx: int) -> dict:
         # Достаём имя файла по индексу
@@ -131,25 +114,27 @@ class EyeDataset(Dataset):
 
     # Метод для проверки состояния датасета
     def make_report(self):
-      reports = []
-      if (not self.data_folder):
-        reports.append("Путь к датасету не указан")
-      if (len(self._image_files) == 0):
-        reports.append("Изображения для распознавания не найдены")
-      else:
-        reports.append(f"Найдено {len(self._image_files)} изображений")
-      cnt_images_without_masks = sum([1 - len(glob.glob(filepath.replace("png", "geojson"))) for filepath in self._image_files])
-      if cnt_images_without_masks > 0:
-        reports.append(f"Найдено {cnt_images_without_masks} изображений без разметки")
-      else:
-        reports.append(f"Для всех изображений есть файл разметки")
-      return reports
+        reports = []
+        if (not self.data_folder):
+            reports.append("Путь к датасету не указан")
+        if (len(self._image_files) == 0):
+            reports.append("Изображения для распознавания не найдены")
+        else:
+            reports.append(f"Найдено {len(self._image_files)} изображений")
+        cnt_images_without_masks = sum(
+            [1 - len(glob.glob(filepath.replace("png", "geojson"))) for filepath in self._image_files])
+        if cnt_images_without_masks > 0:
+            reports.append(f"Найдено {cnt_images_without_masks} изображений без разметки")
+        else:
+            reports.append(f"Для всех изображений есть файл разметки")
+        return reports
 
 
 class DatasetPart(Dataset):
     """
     Обертка над классом датасета для его разбиения на части
     """
+
     def __init__(self, dataset: Dataset,
                  indices: np.ndarray,
                  transform: A.Compose = None):

@@ -5,11 +5,11 @@ import torch
 import torch.nn as nn
 import warnings
 from tqdm import tqdm
+
 warnings.filterwarnings("ignore")
 
 
 class UnetTrainer:
-    class UnetTrainer:
     """
     Класс, реализующий обучение модели
     """
@@ -29,6 +29,43 @@ class UnetTrainer:
         self.metric_functions = metric_functions
 
         self.epoch_number = epoch_number
+
+    @torch.no_grad()
+    def evaluate_batch(self, val_iterator: Iterator, eval_on_n_batches: int) -> Optional[Dict[str, float]]:
+        predictions = []
+        targets = []
+
+        losses = []
+
+        for real_batch_number in range(eval_on_n_batches):
+            try:
+                batch = next(val_iterator)
+
+                xs = batch['image'].to(self.device)
+                ys_true = batch['mask'].to(self.device)
+            except StopIteration:
+                if real_batch_number == 0:
+                    return None
+                else:
+                    break
+            ys_pred = self.model.eval()(xs)
+            loss = self.criterion(ys_pred, ys_true)
+
+            losses.append(loss.item())
+
+            predictions.append(ys_pred.cpu())
+            targets.append(ys_true.cpu())
+
+        predictions = torch.cat(predictions, dim=0)
+        targets = torch.cat(targets, dim=0)
+
+        metrics = {'loss': np.mean(losses)}
+
+        for metric_name, metric_fn in self.metric_functions:
+            metrics[metric_name] = metric_fn(predictions, targets).item()
+
+        return metrics
+
     @torch.no_grad()
     def evaluate(self, val_loader, eval_on_n_batches: int = 1) -> Dict[str, float]:
         """
@@ -132,7 +169,7 @@ class UnetTrainer:
         return metrics
 
     def fit(self, train_loader, num_epochs: int,
-            val_loader=None, update_every_n_batches: int = 1,
+            val_loader = None, update_every_n_batches: int = 1,
             ) -> Dict[str, np.ndarray]:
         """
         Метод, тренирующий модель и вычисляющий метрики для каждой эпохи
@@ -141,7 +178,7 @@ class UnetTrainer:
         summary = defaultdict(list)
 
         def save_metrics(metrics: Dict[str, float], postfix: str = '') -> None:
-            # Сохранение метрик в summary
+          # Сохранение метрик в summary
             nonlocal summary, self
 
             for metric in metrics:
@@ -165,4 +202,6 @@ class UnetTrainer:
                 self.lr_scheduler.step()
 
         summary = {metric: np.array(summary[metric]) for metric in summary}
+
         return summary
+
