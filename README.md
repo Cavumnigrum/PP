@@ -39,12 +39,13 @@
 * [Excessive additional augmentation](https://drive.google.com/file/d/1SjYPfzN2MeycDhyQvImkkqKmO7yAF_oE/view?usp=sharing) 
 
 #### *You should store weights into model folder* 
-\
-\
-\
-\
-***Этот репозиторий служит для отображения работы над проектом по обучению нейросети для определения капилляров глаза по фотографиям.***
-=
+#### *You can check resulted pictures here:* 
+* [Normal](https://drive.google.com/drive/folders/1-LatG1hStsNJEKCCP_KxLnAfS7M_NV_G?usp=sharing)
+* [Additional](https://drive.google.com/drive/folders/1SfTjp2B0fXK5fKlN_fCyCs-jRPojweG3?usp=sharing)
+* [Excessive](https://drive.google.com/drive/folders/1sETPzGmr8myYdCglM-lUm3UKGpRMiJ99?usp=sharing)
+
+# ***Этот репозиторий служит для отображения работы над проектом по обучению нейросети для определения капилляров глаза по фотографиям.***
+
 **Чтобы скопировать результат работы, вам нужно создать среду anaconda с помощью команды _conda env create -n <your_env_name> spec.yaml_**
 -
 *EyeDataset.py файл содержит класс EyeDataset, который является определением класса dataset`a. Также вы можете найти обёртку над классом EyeDataset - PartDataset, целью которой является разделение данных* \
@@ -81,4 +82,8 @@
 * [Стандартные данные](https://drive.google.com/file/d/1xZ5nHI_BWo7VlI9UH8X6FmqItIQWxNWi/view?usp=sharing)
 * [Данные, подвергшиеся небольшой аугментации](https://drive.google.com/file/d/1j_Jc7UsmFrXQNGiw1ndEBpW9xPJ52h4e/view?usp=sharing)
 * [Чрезмерная аугментация данных](https://drive.google.com/file/d/1SjYPfzN2MeycDhyQvImkkqKmO7yAF_oE/view?usp=sharing)\
-*Вам следует сохранить веса в папке model* 
+*Вам следует сохранить веса в папке model*
+#### *Вы можете посмотреть полученные изображения здесь:*
+* [Обычные](https://drive.google.com/drive/folders/1-LatG1hStsNJEKCCP_KxLnAfS7M_NV_G?usp=sharing)
+* [Дополнительные](https://drive.google.com/drive/folders/1SfTjp2B0fXK5fKlN_fCyCs-jRPojweG3?usp=sharing)
+* [Избыточные](https://drive.google.com/drive/folders/1sETPzGmr8myYdCglM-lUm3UKGpRMiJ99?usp=sharing)
